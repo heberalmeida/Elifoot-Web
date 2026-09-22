@@ -89,7 +89,9 @@ const compareTeamsByTable = (
 ) => {
   const statsA = teamA.stats[competition];
   const statsB = teamB.stats[competition];
-  if (statsB.points !== statsA.points) return statsB.points - statsA.points;
+  const pointsA = statsA.wins * 3 + statsA.draws;
+  const pointsB = statsB.wins * 3 + statsB.draws;
+  if (pointsB !== pointsA) return pointsB - pointsA;
 
   const gdA = statsA.goalsFor - statsA.goalsAgainst;
   const gdB = statsB.goalsFor - statsB.goalsAgainst;

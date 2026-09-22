@@ -638,17 +638,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
       updatedTeams[awayIndex].stats[comp].played += 1;
 
       if (match.isKnockout) {
-        if (result.homeScore === result.awayScore) {
-          updatedTeams[homeIndex].stats[comp].draws += 1;
-          updatedTeams[awayIndex].stats[comp].draws += 1;
-        }
-
         if (winnerInfo?.winnerTeamId === home.id) {
           updatedTeams[homeIndex].stats[comp].wins += 1;
+          updatedTeams[homeIndex].stats[comp].points += 3;
           updatedTeams[awayIndex].stats[comp].losses += 1;
         } else if (winnerInfo?.winnerTeamId === away.id) {
           updatedTeams[awayIndex].stats[comp].wins += 1;
+          updatedTeams[awayIndex].stats[comp].points += 3;
           updatedTeams[homeIndex].stats[comp].losses += 1;
+        } else if (result.homeScore === result.awayScore) {
+          updatedTeams[homeIndex].stats[comp].draws += 1;
+          updatedTeams[homeIndex].stats[comp].points += 1;
+          updatedTeams[awayIndex].stats[comp].draws += 1;
+          updatedTeams[awayIndex].stats[comp].points += 1;
         }
       } else if (result.homeScore > result.awayScore) {
         updatedTeams[homeIndex].stats[comp].wins += 1;

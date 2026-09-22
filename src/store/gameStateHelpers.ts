@@ -119,6 +119,20 @@ export const normalizePlayer = (player: Player): Player => {
       );
 };
 
+const repairCompetitionStats = (stats: TeamStats): TeamStats => {
+  const accounted = stats.wins + stats.losses + stats.draws;
+  const draws =
+    accounted > stats.played && stats.played > 0
+      ? Math.max(0, stats.played - stats.wins - stats.losses)
+      : stats.draws;
+
+  return {
+    ...stats,
+    draws,
+    points: stats.wins * 3 + draws,
+  };
+};
+
 export const normalizeTeam = (team: Team, currentYear = DEFAULT_START_YEAR): Team => {
   const normalizedTeam: Team = {
     ...team,
@@ -134,6 +148,9 @@ export const normalizeTeam = (team: Team, currentYear = DEFAULT_START_YEAR): Tea
       : undefined,
     sponsors: (team.sponsors ?? []).map(sponsor => ({ ...sponsor })),
     academyPlayers: (team.academyPlayers ?? []).map(normalizePlayer),
+    stats: Object.fromEntries(
+      Object.entries(team.stats).map(([competition, stats]) => [competition, repairCompetitionStats(stats)]),
+    ) as Team['stats'],
   };
 
   return ensureTeamCommercial(ensureTeamAcademy(ensureTeamSponsors(normalizedTeam, currentYear), currentYear));
