@@ -1,9 +1,12 @@
-import React, { useMemo, useState } from 'react';
-import { Medal, Star, Trophy, Users } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, Medal, Star, Trophy, Users } from 'lucide-react';
 import { useGameStore } from '../store/useGameStore';
+import { cn } from '../lib/utils';
 import { Competition, Player, Position, Team } from '../types/game';
 import { PageHeader } from './ui/PageHeader';
 import { TeamFlag } from './ui/TeamFlag';
+
+const PAGE_SIZE = 20;
 
 const formatOrdinal = (position: number) => `${position}°`;
 
@@ -112,6 +115,65 @@ const renderPositionCell = (index: number) => {
   if (index === 2) return <Medal className="mx-auto h-6 w-6 text-amber-600" />;
   return <span className="font-bold text-slate-500">{formatOrdinal(index + 1)}</span>;
 };
+
+function RankingPagination({
+  page,
+  totalPages,
+  totalItems,
+  onPageChange,
+}: {
+  page: number;
+  totalPages: number;
+  totalItems: number;
+  onPageChange: (page: number) => void;
+}) {
+  if (totalItems === 0) return null;
+
+  const start = (page - 1) * PAGE_SIZE + 1;
+  const end = Math.min(page * PAGE_SIZE, totalItems);
+
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-slate-700 bg-slate-800/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-slate-400">
+        Mostrando <span className="font-bold text-slate-200">{start}-{end}</span> de{' '}
+        <span className="font-bold text-slate-200">{totalItems}</span>
+      </p>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onPageChange(page - 1)}
+          disabled={page <= 1}
+          className={cn(
+            'inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm font-bold transition-colors',
+            page <= 1
+              ? 'cursor-not-allowed border-slate-800 bg-slate-900/40 text-slate-600'
+              : 'border-slate-600 bg-slate-900 text-slate-200 hover:border-emerald-500 hover:text-emerald-400',
+          )}
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Anterior
+        </button>
+        <span className="min-w-[5rem] text-center text-sm font-bold text-slate-300">
+          {page} / {totalPages}
+        </span>
+        <button
+          type="button"
+          onClick={() => onPageChange(page + 1)}
+          disabled={page >= totalPages}
+          className={cn(
+            'inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-sm font-bold transition-colors',
+            page >= totalPages
+              ? 'cursor-not-allowed border-slate-800 bg-slate-900/40 text-slate-600'
+              : 'border-slate-600 bg-slate-900 text-slate-200 hover:border-emerald-500 hover:text-emerald-400',
+          )}
+        >
+          Proxima
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function RankingFilters({
   countries,
@@ -265,6 +327,7 @@ export function Ranking({
   const [teamFilter, setTeamFilter] = useState('ALL');
   const [divisionFilter, setDivisionFilter] = useState('ALL');
   const [positionFilter, setPositionFilter] = useState<'ALL' | Position>('ALL');
+  const [page, setPage] = useState(1);
 
   const clubTeams = useMemo(
     () => teams.filter(team => team.division > 0).sort((teamA, teamB) => teamA.name.localeCompare(teamB.name)),
@@ -344,6 +407,19 @@ export function Ranking({
   }, [clubTeams, competitionFilter, countryFilter, divisionFilter, positionFilter, searchTerm, teamFilter]);
 
   const isPlayerMode = gameMode === 'player';
+  const rankingItems = isPlayerMode ? filteredPlayers : filteredTeams;
+  const totalPages = Math.max(1, Math.ceil(rankingItems.length / PAGE_SIZE));
+  const pageOffset = (page - 1) * PAGE_SIZE;
+  const paginatedTeams = filteredTeams.slice(pageOffset, pageOffset + PAGE_SIZE);
+  const paginatedPlayers = filteredPlayers.slice(pageOffset, pageOffset + PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, competitionFilter, countryFilter, teamFilter, divisionFilter, positionFilter, isPlayerMode]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   return (
     <div className="space-y-6">
@@ -378,124 +454,146 @@ export function Ranking({
       />
 
       {!isPlayerMode ? (
-        <div className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-800">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left">
-              <thead>
-                <tr className="border-b border-slate-700 bg-slate-900/50">
-                  <th className="w-16 p-4 text-center font-medium text-slate-400">Pos</th>
-                  <th className="p-4 font-medium text-slate-400">Clube</th>
-                  <th className="p-4 text-center font-medium text-slate-400">Pais</th>
-                  <th className="p-4 text-center font-medium text-slate-400">Divisao</th>
-                  <th className="p-4 text-right font-medium text-slate-400">
-                    {competitionFilter === 'ALL' ? 'Pontos Historicos' : 'Pontos'}
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-700/50">
-                {filteredTeams.map((team, index) => (
-                  <tr
-                    key={team.id}
-                    className={`transition-colors hover:bg-slate-700/30 ${team.id === userTeamId ? 'bg-emerald-900/20' : ''}`}
-                  >
-                    <td className="p-4 text-center">{renderPositionCell(index)}</td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <TeamFlag country={team.country} teamName={team.name} size="xs" />
-                        <span className={`font-bold ${team.id === userTeamId ? 'text-emerald-400' : 'text-slate-200'}`}>
-                          {team.name}
-                        </span>
-                        {team.id === userTeamId && <Star className="h-4 w-4 fill-emerald-400 text-emerald-400" />}
-                      </div>
-                    </td>
-                    <td className="p-4 text-center">
-                      <span className="rounded bg-slate-700 px-2 py-1 text-xs font-bold text-slate-300">{team.country}</span>
-                    </td>
-                    <td className="p-4 text-center text-slate-400">{formatDivision(team.division)}</td>
-                    <td className="p-4 text-right">
-                      <div className="flex items-center justify-end gap-3">
-                        <span className="text-lg font-bold text-yellow-400">
-                          {getTeamCompetitionScore(team, competitionFilter).toLocaleString('pt-BR')}
-                        </span>
-                        {onViewSquad && (
+        <>
+          <div className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-800">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left">
+                <thead>
+                  <tr className="border-b border-slate-700 bg-slate-900/50">
+                    <th className="w-16 p-4 text-center font-medium text-slate-400">Pos</th>
+                    <th className="p-4 font-medium text-slate-400">Clube</th>
+                    <th className="p-4 text-center font-medium text-slate-400">Pais</th>
+                    <th className="p-4 text-center font-medium text-slate-400">Divisao</th>
+                    <th className="p-4 text-right font-medium text-slate-400">
+                      {competitionFilter === 'ALL' ? 'Pontos Historicos' : 'Pontos'}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700/50">
+                  {paginatedTeams.map((team, index) => {
+                    const absoluteIndex = pageOffset + index;
+                    return (
+                      <tr
+                        key={team.id}
+                        className={`transition-colors hover:bg-slate-700/30 ${team.id === userTeamId ? 'bg-emerald-900/20' : ''}`}
+                      >
+                        <td className="p-4 text-center">{renderPositionCell(absoluteIndex)}</td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
+                            <TeamFlag country={team.country} teamName={team.name} size="xs" />
+                            <span className={`font-bold ${team.id === userTeamId ? 'text-emerald-400' : 'text-slate-200'}`}>
+                              {team.name}
+                            </span>
+                            {team.id === userTeamId && <Star className="h-4 w-4 fill-emerald-400 text-emerald-400" />}
+                          </div>
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className="rounded bg-slate-700 px-2 py-1 text-xs font-bold text-slate-300">{team.country}</span>
+                        </td>
+                        <td className="p-4 text-center text-slate-400">{formatDivision(team.division)}</td>
+                        <td className="p-4 text-right">
+                          <div className="flex items-center justify-end gap-3">
+                            <span className="text-lg font-bold text-yellow-400">
+                              {getTeamCompetitionScore(team, competitionFilter).toLocaleString('pt-BR')}
+                            </span>
+                            {onViewSquad && (
+                              <button
+                                type="button"
+                                onClick={() => onViewSquad(team.id, competitionFilter)}
+                                className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-xs font-bold text-emerald-400 transition hover:border-emerald-500 hover:bg-slate-800"
+                              >
+                                Ver plantel
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <RankingPagination
+            page={page}
+            totalPages={totalPages}
+            totalItems={filteredTeams.length}
+            onPageChange={setPage}
+          />
+        </>
+      ) : (
+        <>
+          <div className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-800">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-left">
+                <thead>
+                  <tr className="border-b border-slate-700 bg-slate-900/50">
+                    <th className="w-16 p-4 text-center font-medium text-slate-400">Pos</th>
+                    <th className="p-4 font-medium text-slate-400">Jogador</th>
+                    <th className="p-4 text-center font-medium text-slate-400">Equipe</th>
+                    <th className="p-4 text-center font-medium text-slate-400">Pais</th>
+                    <th className="p-4 text-center font-medium text-slate-400">Posicao</th>
+                    <th className="p-4 text-center font-medium text-slate-400">OVR</th>
+                    <th className="p-4 text-center font-medium text-slate-400">G</th>
+                    <th className="p-4 text-center font-medium text-slate-400">A</th>
+                    <th className="p-4 text-center font-medium text-slate-400">Nota</th>
+                    <th className="p-4 text-right font-medium text-slate-400">Indice</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700/50">
+                  {paginatedPlayers.map(({ player, team, score }, index) => {
+                    const absoluteIndex = pageOffset + index;
+                    return (
+                      <tr
+                        key={player.id}
+                        className={`transition-colors hover:bg-slate-700/30 ${player.id === userPlayerId ? 'bg-emerald-900/20' : ''}`}
+                      >
+                        <td className="p-4 text-center">{renderPositionCell(absoluteIndex)}</td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
+                            <span className={`font-bold ${player.id === userPlayerId ? 'text-emerald-400' : 'text-slate-200'}`}>
+                              {player.name}
+                            </span>
+                            {player.id === userPlayerId && <Star className="h-4 w-4 fill-emerald-400 text-emerald-400" />}
+                          </div>
+                        </td>
+                        <td className="p-4 text-center text-slate-300">
                           <button
                             type="button"
-                            onClick={() => onViewSquad(team.id, competitionFilter)}
-                            className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-xs font-bold text-emerald-400 transition hover:border-emerald-500 hover:bg-slate-800"
+                            onClick={() => onViewSquad?.(team.id, competitionFilter)}
+                            className="inline-flex items-center gap-2 rounded-lg px-2 py-1 transition hover:bg-slate-700/60 hover:text-emerald-400"
                           >
-                            Ver plantel
+                            <TeamFlag country={team.country} teamName={team.name} size="xs" />
+                            <span>{team.name}</span>
                           </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className="rounded bg-slate-700 px-2 py-1 text-xs font-bold text-slate-300">
+                            {team.country}
+                          </span>
+                        </td>
+                        <td className="p-4 text-center text-slate-300">{getPositionLabel(player.position)}</td>
+                        <td className="p-4 text-center text-slate-200">{player.overall}</td>
+                        <td className="p-4 text-center text-slate-200">{player.goals}</td>
+                        <td className="p-4 text-center text-slate-200">{player.assists}</td>
+                        <td className="p-4 text-center text-slate-200">{(player.averageRating ?? 0).toFixed(1)}</td>
+                        <td className="p-4 text-right">
+                          <span className="text-lg font-bold text-yellow-400">{Math.round(score).toLocaleString('pt-BR')}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-800">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left">
-              <thead>
-                <tr className="border-b border-slate-700 bg-slate-900/50">
-                  <th className="w-16 p-4 text-center font-medium text-slate-400">Pos</th>
-                  <th className="p-4 font-medium text-slate-400">Jogador</th>
-                  <th className="p-4 text-center font-medium text-slate-400">Equipe</th>
-                  <th className="p-4 text-center font-medium text-slate-400">Pais</th>
-                  <th className="p-4 text-center font-medium text-slate-400">Posicao</th>
-                  <th className="p-4 text-center font-medium text-slate-400">OVR</th>
-                  <th className="p-4 text-center font-medium text-slate-400">G</th>
-                  <th className="p-4 text-center font-medium text-slate-400">A</th>
-                  <th className="p-4 text-center font-medium text-slate-400">Nota</th>
-                  <th className="p-4 text-right font-medium text-slate-400">Indice</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-700/50">
-                {filteredPlayers.map(({ player, team, score }, index) => (
-                  <tr
-                    key={player.id}
-                    className={`transition-colors hover:bg-slate-700/30 ${player.id === userPlayerId ? 'bg-emerald-900/20' : ''}`}
-                  >
-                    <td className="p-4 text-center">{renderPositionCell(index)}</td>
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        <span className={`font-bold ${player.id === userPlayerId ? 'text-emerald-400' : 'text-slate-200'}`}>
-                          {player.name}
-                        </span>
-                        {player.id === userPlayerId && <Star className="h-4 w-4 fill-emerald-400 text-emerald-400" />}
-                      </div>
-                    </td>
-                    <td className="p-4 text-center text-slate-300">
-                      <button
-                        type="button"
-                        onClick={() => onViewSquad?.(team.id, competitionFilter)}
-                        className="inline-flex items-center gap-2 rounded-lg px-2 py-1 transition hover:bg-slate-700/60 hover:text-emerald-400"
-                      >
-                        <TeamFlag country={team.country} teamName={team.name} size="xs" />
-                        <span>{team.name}</span>
-                      </button>
-                    </td>
-                    <td className="p-4 text-center">
-                      <span className="rounded bg-slate-700 px-2 py-1 text-xs font-bold text-slate-300">
-                        {team.country}
-                      </span>
-                    </td>
-                    <td className="p-4 text-center text-slate-300">{getPositionLabel(player.position)}</td>
-                    <td className="p-4 text-center text-slate-200">{player.overall}</td>
-                    <td className="p-4 text-center text-slate-200">{player.goals}</td>
-                    <td className="p-4 text-center text-slate-200">{player.assists}</td>
-                    <td className="p-4 text-center text-slate-200">{(player.averageRating ?? 0).toFixed(1)}</td>
-                    <td className="p-4 text-right">
-                      <span className="text-lg font-bold text-yellow-400">{Math.round(score).toLocaleString('pt-BR')}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+          <RankingPagination
+            page={page}
+            totalPages={totalPages}
+            totalItems={filteredPlayers.length}
+            onPageChange={setPage}
+          />
+        </>
       )}
     </div>
   );
