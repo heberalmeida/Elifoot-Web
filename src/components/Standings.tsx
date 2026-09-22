@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Globe, Map as MapIcon, Trophy } from 'lucide-react';
 import { useGameStore } from '../store/useGameStore';
 import { sortTeamsByCompetitionTable } from '../game/engine';
-import { cn } from '../lib/utils';
+import { cn, findPlayerClub } from '../lib/utils';
 import { Competition, Match, Team } from '../types/game';
 import { TeamFlag } from './ui/TeamFlag';
 
@@ -136,9 +136,11 @@ const getTopScorers = (participants: Team[], competition: Competition) =>
 function InternationalCompetitionPanel({
   competition,
   title,
+  onViewSquad,
 }: {
   competition: Competition;
   title: string;
+  onViewSquad?: (teamId: string, competition?: 'ALL' | Competition) => void;
 }) {
   const { teams, matches, currentYear = 2026, competitionHistory } = useGameStore();
   const competitionMatches = matches.filter(match => match.competition === competition);
@@ -354,19 +356,45 @@ function InternationalCompetitionPanel({
                       </p>
                       <p className="text-xs text-slate-400">{calledPlayers.length} convocados</p>
                     </div>
-                    <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-400">
-                      {team.country}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-400">
+                        {team.country}
+                      </span>
+                      {onViewSquad && (
+                        <button
+                          type="button"
+                          onClick={() => onViewSquad(team.id, competition)}
+                          className="rounded-lg border border-slate-600 bg-slate-950 px-3 py-1.5 text-xs font-bold text-emerald-400 transition hover:border-emerald-500"
+                        >
+                          Ver plantel
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-2">
-                    {calledPlayers.slice(0, 6).map(player => (
-                      <div key={player.id} className="flex items-center justify-between gap-4 text-sm">
-                        <span className="text-slate-300">{player.name}</span>
-                        <span className="text-slate-400">
-                          {player.position} · {player.overall}
-                        </span>
-                      </div>
-                    ))}
+                    {calledPlayers.slice(0, 6).map(player => {
+                      const club = findPlayerClub(teams, player.id);
+                      return (
+                        <div key={player.id} className="flex items-center justify-between gap-4 text-sm">
+                          <div className="min-w-0">
+                            <p className="truncate text-slate-300">{player.name}</p>
+                            <p className="inline-flex items-center gap-1.5 truncate text-xs text-slate-500">
+                              {club ? (
+                                <>
+                                  <TeamFlag country={club.country} teamName={club.name} size="xs" />
+                                  <span>{club.name}</span>
+                                </>
+                              ) : (
+                                <span>Sem clube</span>
+                              )}
+                            </p>
+                          </div>
+                          <span className="shrink-0 text-slate-400">
+                            {player.position} · {player.overall}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -382,7 +410,11 @@ function InternationalCompetitionPanel({
   );
 }
 
-export function Standings() {
+export function Standings({
+  onViewSquad,
+}: {
+  onViewSquad?: (teamId: string, competition?: 'ALL' | Competition) => void;
+}) {
   const { teams, matches, userTeamId, currentYear = 2026 } = useGameStore();
   const userTeam = teams.find(team => team.id === userTeamId);
   const [activeComp, setActiveComp] = useState<Competition>('LEAGUE');
@@ -445,7 +477,7 @@ export function Standings() {
       </div>
 
       {isInternationalTab ? (
-        <InternationalCompetitionPanel competition={activeComp} title={title} />
+        <InternationalCompetitionPanel competition={activeComp} title={title} onViewSquad={onViewSquad} />
       ) : (
         <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
           <div className="p-4 bg-slate-900/50 border-b border-slate-700">
@@ -470,6 +502,7 @@ export function Standings() {
                   <th className="px-4 py-4 font-medium text-center">GP</th>
                   <th className="px-4 py-4 font-medium text-center">GC</th>
                   <th className="px-4 py-4 font-medium text-center">SG</th>
+                  {onViewSquad && <th className="px-4 py-4 font-medium text-center">Plantel</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/50">
@@ -488,14 +521,16 @@ export function Standings() {
                         <div className="flex items-center gap-2">
                           <TeamFlag country={team.country} teamName={team.name} size="xs" />
                           <span>{team.name}</span>
-                        {team.id === userTeamId && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                            VOCÊ
-                          </span>
-                        )}
+                          {team.id === userTeamId && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                              VOCÊ
+                            </span>
+                          )}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-center font-bold text-emerald-400">{stats.points}</td>
+                      <td className="px-4 py-3 text-center font-bold text-emerald-400">
+                        {stats.wins * 3 + stats.draws}
+                      </td>
                       <td className="px-4 py-3 text-center text-slate-400">{stats.played}</td>
                       <td className="px-4 py-3 text-center text-slate-300">{stats.wins}</td>
                       <td className="px-4 py-3 text-center text-slate-300">{stats.draws}</td>
@@ -505,12 +540,23 @@ export function Standings() {
                       <td className="px-4 py-3 text-center font-medium text-slate-300">
                         {stats.goalsFor - stats.goalsAgainst}
                       </td>
+                      {onViewSquad && (
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => onViewSquad(team.id, activeComp)}
+                            className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-xs font-bold text-emerald-400 transition hover:border-emerald-500 hover:bg-slate-800"
+                          >
+                            Ver
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
                 {sortedTeams.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="px-6 py-10 text-center text-slate-500">
+                    <td colSpan={onViewSquad ? 11 : 10} className="px-6 py-10 text-center text-slate-500">
                       Nenhum clube listado para esta competição no momento.
                     </td>
                   </tr>

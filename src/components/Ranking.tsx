@@ -36,7 +36,9 @@ const getTeamCompetitionScore = (team: Team, competitionFilter: 'ALL' | Competit
     return team.historicalPoints;
   }
 
-  return team.stats[competitionFilter]?.points ?? 0;
+  const stats = team.stats[competitionFilter];
+  if (!stats) return 0;
+  return stats.wins * 3 + stats.draws;
 };
 
 const getPlayerRankingScore = (player: Player) => {
@@ -247,7 +249,11 @@ function RankingFilters({
   );
 }
 
-export function Ranking() {
+export function Ranking({
+  onViewSquad,
+}: {
+  onViewSquad?: (teamId: string, competition?: 'ALL' | Competition) => void;
+}) {
   const teams = useGameStore(state => state.teams);
   const gameMode = useGameStore(state => state.gameMode);
   const userTeamId = useGameStore(state => state.userTeamId);
@@ -283,7 +289,8 @@ export function Ranking() {
         if (competitionFilter !== 'ALL') {
           const statsA = teamA.stats[competitionFilter];
           const statsB = teamB.stats[competitionFilter];
-          const pointsDiff = (statsB?.points ?? 0) - (statsA?.points ?? 0);
+          const pointsDiff =
+            ((statsB?.wins ?? 0) * 3 + (statsB?.draws ?? 0)) - ((statsA?.wins ?? 0) * 3 + (statsA?.draws ?? 0));
           if (pointsDiff !== 0) return pointsDiff;
 
           const goalDiffA = (statsA?.goalsFor ?? 0) - (statsA?.goalsAgainst ?? 0);
@@ -406,9 +413,20 @@ export function Ranking() {
                     </td>
                     <td className="p-4 text-center text-slate-400">{formatDivision(team.division)}</td>
                     <td className="p-4 text-right">
-                      <span className="text-lg font-bold text-yellow-400">
-                        {getTeamCompetitionScore(team, competitionFilter).toLocaleString('pt-BR')}
-                      </span>
+                      <div className="flex items-center justify-end gap-3">
+                        <span className="text-lg font-bold text-yellow-400">
+                          {getTeamCompetitionScore(team, competitionFilter).toLocaleString('pt-BR')}
+                        </span>
+                        {onViewSquad && (
+                          <button
+                            type="button"
+                            onClick={() => onViewSquad(team.id, competitionFilter)}
+                            className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-1.5 text-xs font-bold text-emerald-400 transition hover:border-emerald-500 hover:bg-slate-800"
+                          >
+                            Ver plantel
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -450,10 +468,14 @@ export function Ranking() {
                       </div>
                     </td>
                     <td className="p-4 text-center text-slate-300">
-                      <span className="inline-flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onViewSquad?.(team.id, competitionFilter)}
+                        className="inline-flex items-center gap-2 rounded-lg px-2 py-1 transition hover:bg-slate-700/60 hover:text-emerald-400"
+                      >
                         <TeamFlag country={team.country} teamName={team.name} size="xs" />
                         <span>{team.name}</span>
-                      </span>
+                      </button>
                     </td>
                     <td className="p-4 text-center">
                       <span className="rounded bg-slate-700 px-2 py-1 text-xs font-bold text-slate-300">
