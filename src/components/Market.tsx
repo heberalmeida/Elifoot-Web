@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useGameStore } from '../store/useGameStore';
 import { DollarSign, TrendingUp, UserMinus, UserPlus } from 'lucide-react';
-import { cn } from '../lib/utils';
+import { cn, findPlayerClub } from '../lib/utils';
 import { PageHeader } from './ui/PageHeader';
 import { ScreenTabs } from './ui/ScreenTabs';
+import { TeamFlag } from './ui/TeamFlag';
 
 const getAskingPrice = (
   value: number,
@@ -72,6 +73,7 @@ export function Market() {
           ) : (
             <div className="space-y-3">
               {marketPlayers.map(player => {
+                const club = findPlayerClub(teams, player.id);
                 const askingPrice = getAskingPrice(
                   player.value,
                   player.age,
@@ -87,7 +89,7 @@ export function Market() {
                   >
                     <div>
                       <p className="font-bold text-slate-200">{player.name}</p>
-                      <div className="mt-1 flex items-center gap-3 text-sm">
+                      <div className="mt-1 flex flex-wrap items-center gap-3 text-sm">
                         <span
                           className={cn(
                             'rounded px-2 py-0.5 text-[10px] font-bold',
@@ -101,6 +103,16 @@ export function Market() {
                           )}
                         >
                           {player.position}
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 text-slate-300">
+                          {club ? (
+                            <>
+                              <TeamFlag country={club.country} teamName={club.name} size="xs" />
+                              <span>{club.name}</span>
+                            </>
+                          ) : (
+                            <span className="text-slate-500">Sem clube</span>
+                          )}
                         </span>
                         <span className="text-slate-400">Idade: {player.age}</span>
                         <span className="text-slate-400">
